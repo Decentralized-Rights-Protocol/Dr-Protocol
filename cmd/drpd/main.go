@@ -12,7 +12,9 @@ import (
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP gateway address")
 	flag.Parse()
-	srv := network.New(store.New())
+
+	node := network.New(store.New())
+	handler := network.NewReplicationHandler(node)
 	log.Printf("DRP Verification Network v0.1 listening on %s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, srv.Handler()))
+	log.Fatal(http.ListenAndServe(*addr, handler))
 }
