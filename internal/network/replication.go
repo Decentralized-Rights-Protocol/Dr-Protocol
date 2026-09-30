@@ -3,6 +3,8 @@ package network
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -82,7 +84,7 @@ func (s *Server) replicationHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payload, err := envelopePayload(e)
-	if err != nil || !drpcrypto.VerifyString(e.SenderID, payload, e.Signature) {
+	if err != nil || !verifyPublicKeySignature(e.SenderID, payload, e.Signature) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid replication signature"})
 		return
 	}
@@ -100,6 +102,14 @@ func (s *Server) replicationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	s.Store.PutProof(e.Proof)
 	writeJSON(w, http.StatusCreated, map[string]string{"status": "replicated", "id": e.Proof.ID})
+}
+
+func verifyPublicKeySignature(publicKey string, payload []byte, signature string) bool {
+	pub, err := base64.RawURLEncoding.DecodeString(publicKey)
+	if err != nil || len(pub) != ed25519.PublicKeySize {
+		return false
+	}
+	return drpcrypto.Verify(ed25519.PublicKey(pub), payload, signature)
 }
 
 func (s *Server) isKnownPeer(id string) bool {

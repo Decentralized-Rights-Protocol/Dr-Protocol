@@ -15,7 +15,6 @@ func TestTwoNodeProofReplication(t *testing.T) {
 	proofReq := NewRequest("r1", "alice", "activity", "performed X", nil)
 	proofReq.Evidence = []protocol.Evidence{{Version: protocol.Version, ID: "e1", SourceID: "phone", Type: "attestation", ContentHash: "abc"}}
 
-	// Produce a real signed proof on node A through the normal verification endpoint.
 	body, err := jsonBody(proofReq)
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +31,6 @@ func TestTwoNodeProofReplication(t *testing.T) {
 		t.Fatal("node A did not persist proof")
 	}
 
-	// Pin node A's public key as a trusted peer on node B.
 	nodeB.Peers.Upsert(Peer{ID: nodeA.Signer.PublicKeyString(), Address: "node-a"})
 
 	ts := httptest.NewServer(NewReplicationHandler(nodeB))
@@ -51,19 +49,7 @@ func TestTwoNodeProofReplication(t *testing.T) {
 		t.Fatal("node B proof differs from node A proof")
 	}
 
-	// Replaying the same proof must be idempotent.
 	if err := nodeA.ReplicateProof(testContext(), peer, proof); err != nil {
 		t.Fatalf("idempotent replay failed: %v", err)
 	}
-}
-
-func TestReplicationRejectsUnknownPeer(t *testing.T) {
-	node := New(store.New())
-	ts := httptest.NewServer(NewReplicationHandler(node))
-	defer ts.Close()
-
-	proof := protocol.Proof{Version: protocol.Version, ID: "p1"}
-	node := node
-	_ = proof
-	_ = ts
 }
