@@ -38,6 +38,6 @@ Then:
 curl http://localhost:8080/health
 ```
 
-## Current limitations
+## Phase A cryptographic hardening\n\nThe current Phase A branch uses purpose-specific SHA-256 digest domains for claims, policies, and evidence, plus separate Ed25519 signature domains for proof objects and peer-replication envelopes. The node key loader also repairs existing key-file permissions to `0600`. These changes alter the digest/signature format; pre-Phase-A proofs require an explicit legacy verification path if they must remain verifiable. The Go JSON representation is currently deterministic for these structs, but cross-language canonical JSON interoperability remains future work.\n\n## Current limitations
 
 The verifier registry and peer book are still in-memory and must be reconfigured after restart. Replication is authenticated HTTP proof exchange, not BFT consensus. The JSON store is intended as a single-process MVP backend; concurrent daemon processes must not share one data directory. The protocol is experimental (v0.1) and not production-secure until audited.
