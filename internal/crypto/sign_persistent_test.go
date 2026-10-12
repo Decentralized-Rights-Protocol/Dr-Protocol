@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"crypto/ed25519"
 	"encoding/base64"
+	"encoding/json"
 
 	"github.com/Decentralized-Rights-Protocol/Dr-Protocol/internal/protocol"
 	"testing"
@@ -88,5 +89,27 @@ func TestProofSignatureCoversAllProofFields(t *testing.T) {
 	}
 	if VerifyProof(proof, base64.RawURLEncoding.EncodeToString(ed25519.PublicKey{})) {
 		t.Fatal("invalid public key unexpectedly verified")
+	}
+}
+
+func TestVerifyProofSupportsLegacyProofsWithoutSchemeField(t *testing.T) {
+	signer, err := NewSigner()
+	if err != nil {
+		t.Fatalf("create signer: %v", err)
+	}
+	proof := protocol.Proof{
+		Version: protocol.Version,
+		ID: "legacy-proof",
+		ClaimDigest: "claim-digest",
+		PolicyDigest: "policy-digest",
+		EvidenceDigests: []string{"evidence-1"},
+	}
+	payload, err := json.Marshal(proof)
+	if err != nil {
+		t.Fatalf("marshal legacy proof: %v", err)
+	}
+	proof.Signature = signer.Sign(payload)
+	if !VerifyProof(proof, signer.PublicKeyString()) {
+		t.Fatal("legacy proof signature should remain verifiable")
 	}
 }
