@@ -108,9 +108,17 @@ type Challenge struct {
 }
 
 func CanonicalDigest(v any) (string, error) {
+	return CanonicalDigestDomain("drp/object/v1", v)
+}
+
+// CanonicalDigestDomain binds a digest to its protocol purpose so identical
+// JSON bytes used in different object roles do not share a digest namespace.
+func CanonicalDigestDomain(domain string, v any) (string, error) {
+	if domain == "" { return "", errors.New("digest domain is required") }
 	b, err := json.Marshal(v)
 	if err != nil { return "", err }
-	h := sha256.Sum256(b)
+	payload := append([]byte("DRP-DIGEST-V1\\x00"+domain+"\\x00"), b...)
+	h := sha256.Sum256(payload)
 	return hex.EncodeToString(h[:]), nil
 }
 
