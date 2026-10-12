@@ -117,7 +117,7 @@ func CanonicalDigestDomain(domain string, v any) (string, error) {
 	if domain == "" { return "", errors.New("digest domain is required") }
 	b, err := json.Marshal(v)
 	if err != nil { return "", err }
-	payload := append([]byte("DRP-DIGEST-V1\\x00"+domain+"\\x00"), b...)
+	payload := append([]byte("DRP-DIGEST-V1\x00"+domain+"\x00"), b...)
 	h := sha256.Sum256(payload)
 	return hex.EncodeToString(h[:]), nil
 }
