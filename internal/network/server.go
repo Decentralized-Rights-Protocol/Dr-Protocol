@@ -67,9 +67,8 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 		evidenceDigests = append(evidenceDigests, d)
 	}
 	proof := protocol.Proof{Version:protocol.Version, ID:req.ID+":proof", ClaimDigest:digest, PolicyDigest:policyDigest, EvidenceDigests:evidenceDigests, Result:result, CreatedAt:time.Now().UTC()}
-	payload, err := json.Marshal(proof)
-	if err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not encode proof"}); return }
-	proof.Signature = s.Signer.Sign(payload)
+	proof, err = drpcrypto.SignProof(s.Signer, proof)
+	if err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not sign proof"}); return }
 	if err := s.Store.PutProof(proof); err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not persist proof"}); return }
 	writeJSON(w, http.StatusAccepted, map[string]any{"result":result, "proof":proof, "network":"DRP Verification Network"})
 }
