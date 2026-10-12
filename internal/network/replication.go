@@ -28,7 +28,7 @@ func (s *Server) SignProofForReplication(p protocol.Proof) (proofEnvelope, error
 	e := proofEnvelope{Version:protocol.Version, SenderID:s.Signer.PublicKeyString(), Proof:p}
 	payload, err := envelopePayload(e)
 	if err != nil { return proofEnvelope{}, err }
-	e.Signature = s.Signer.Sign(payload)
+	e.Signature = s.Signer.SignDomain("drp/replication-envelope/v1", payload)
 	return e, nil
 }
 
@@ -68,7 +68,7 @@ func (s *Server) replicationHandler(w http.ResponseWriter, r *http.Request) {
 func verifyPublicKeySignature(publicKey string, payload []byte, signature string) bool {
 	pub, err := base64.RawURLEncoding.DecodeString(publicKey)
 	if err != nil || len(pub) != ed25519.PublicKeySize { return false }
-	return drpcrypto.Verify(ed25519.PublicKey(pub), payload, signature)
+	return drpcrypto.VerifyDomain(ed25519.PublicKey(pub), "drp/replication-envelope/v1", payload, signature)
 }
 
 func (s *Server) isKnownPeer(id string) bool { for _, p := range s.Peers.List() { if p.ID == id { return true } }; return false }
