@@ -9,6 +9,7 @@ import (
 )
 
 const proofSignatureDomain = "drp/proof/v1"
+const proofSignatureScheme = "ed25519-drp-proof-v1"
 
 func (s *Signer) PublicKeyString() string {
 	return base64.RawURLEncoding.EncodeToString(s.Public)
@@ -19,6 +20,7 @@ func (s *Signer) PublicKeyString() string {
 // signature from being accepted as a different kind of DRP message.
 func SignProof(s *Signer, p protocol.Proof) (protocol.Proof, error) {
 	p.Signature = ""
+	p.SignatureScheme = proofSignatureScheme
 	payload, err := json.Marshal(p)
 	if err != nil {
 		return protocol.Proof{}, err
@@ -38,5 +40,14 @@ func VerifyProof(p protocol.Proof, publicKey string) bool {
 	if err != nil {
 		return false
 	}
-	return VerifyDomain(ed25519.PublicKey(pub), proofSignatureDomain, payload, signature)
+	switch p.SignatureScheme {
+	case proofSignatureScheme:
+		return VerifyDomain(ed25519.PublicKey(pub), proofSignatureDomain, payload, signature)
+	case "":
+		// Backward compatibility for pre-Phase-A proofs. A Phase-A signature
+		// cannot pass this path because it includes the domain prefix.
+		return Verify(ed25519.PublicKey(pub), payload, signature)
+	default:
+		return false
+	}
 }
