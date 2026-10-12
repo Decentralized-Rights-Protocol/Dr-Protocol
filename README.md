@@ -13,20 +13,24 @@ The MVP is intentionally transport-agnostic at the protocol layer and uses HTTP 
 ## Repository layout
 
 - `cmd/drpd` — DRP node daemon
-- `internal/protocol` — canonical protocol objects and validation
-- `internal/crypto` — signatures and hashing
+- `internal/protocol` — versioned protocol objects and validation
+- `internal/crypto` — Ed25519 signatures and hashing
 - `internal/verification` — policy evaluation and verifier quorum
-- `internal/network` — HTTP gateway and peer primitives
-- `internal/store` — local durable MVP store
+- `internal/network` — HTTP gateway and authenticated peer proof replication
+- `internal/store` — in-memory test store and atomic JSON-backed node store
 - `cmd/drp` — developer CLI
-- `docs/protocol-spec.md` — normative protocol specification
+- `docs/protocol-spec.md` — protocol specification
 
 ## Run
 
+Requires Go 1.23 or newer.
+
 ```bash
 go test ./...
-go run ./cmd/drpd --addr :8080
+go run ./cmd/drpd --addr :8080 --data-dir ./data
 ```
+
+The daemon creates `./data/store.json` for requests, proofs and attestations, and `./data/node-ed25519.key` for its stable Ed25519 node identity. Keep this directory on a persistent volume and back it up securely. Do not commit it or expose it publicly. The default data directory is local to one process; it is not blockchain consensus or a multi-node database.
 
 Then:
 
@@ -34,4 +38,6 @@ Then:
 curl http://localhost:8080/health
 ```
 
-The protocol is experimental (v0.1) and not production-secure until audited.
+## Current limitations
+
+The verifier registry and peer book are still in-memory and must be reconfigured after restart. Replication is authenticated HTTP proof exchange, not BFT consensus. The JSON store is intended as a single-process MVP backend; concurrent daemon processes must not share one data directory. The protocol is experimental (v0.1) and not production-secure until audited.
