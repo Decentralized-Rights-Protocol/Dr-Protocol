@@ -93,6 +93,7 @@ type Proof struct {
 	ClaimDigest string `json:"claimDigest"`
 	PolicyDigest string `json:"policyDigest"`
 	EvidenceDigests []string `json:"evidenceDigests"`
+	SignatureScheme string `json:"signatureScheme,omitempty"`
 	Result VerificationResult `json:"result"`
 	Signature string `json:"signature"`
 	CreatedAt time.Time `json:"createdAt"`
