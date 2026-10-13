@@ -1,0 +1,34 @@
+{
+  "name": "drp-protocol-cli",
+  "version": "0.1.0",
+  "description": "Command-line client for the Decentralized Rights Protocol verification network",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "drp": "./src/index.js"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "keywords": [
+    "drp",
+    "decentralized-rights-protocol",
+    "verification",
+    "blockchain",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Decentralized-Rights-Protocol/Dr-Protocol.git",
+    "directory": "npm-cli"
+  },
+  "homepage": "https://github.com/Decentralized-Rights-Protocol/Dr-Protocol/tree/main/npm-cli",
+  "bugs": {
+    "url": "https://github.com/Decentralized-Rights-Protocol/Dr-Protocol/issues"
+  }
+}
