@@ -69,6 +69,7 @@ type Attestation struct {
 	Version string `json:"version"`
 	ID string `json:"id"`
 	VerifierID string `json:"verifierId"`
+	SignatureAlgorithm string `json:"signatureAlgorithm,omitempty"`
 	ClaimID string `json:"claimId"`
 	Decision Status `json:"decision"`
 	Reason string `json:"reason,omitempty"`
@@ -89,6 +90,9 @@ type VerificationResult struct {
 
 type Proof struct {
 	Version string `json:"version"`
+	SignatureAlgorithm string `json:"signatureAlgorithm,omitempty"`
+	SignerID string `json:"signerId,omitempty"`
+	SignerKeyID string `json:"signerKeyId,omitempty"`
 	ID string `json:"id"`
 	ClaimDigest string `json:"claimDigest"`
 	PolicyDigest string `json:"policyDigest"`
@@ -130,4 +134,14 @@ func (r VerificationRequest) Validate() error {
 	if err := r.Policy.Validate(); err != nil { return err }
 	if len(r.Evidence) < r.Policy.MinEvidence { return errors.New("insufficient evidence") }
 	return nil
+}
+
+
+// ProofSigningBytes returns the exact versioned JSON envelope that is signed.
+// Signature is cleared so the payload is stable before and after signing.
+// The Go JSON encoding is currently the protocol's serialization contract;
+// cross-language implementations need a separately specified canonical format.
+func ProofSigningBytes(p Proof) ([]byte, error) {
+	p.Signature = ""
+	return json.Marshal(p)
 }

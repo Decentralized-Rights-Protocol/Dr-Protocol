@@ -2,7 +2,7 @@ name: DRP Protocol CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/**"]
   pull_request:
     branches: [main]
 
@@ -21,6 +21,12 @@ jobs:
         run: go build ./cmd/drpd
       - name: Build Go CLI
         run: go build ./cmd/drp
+      - name: Build post-quantum utility
+        run: go build ./cmd/drp-pqc
+      - name: Build independent proof verifier
+        run: go build ./cmd/drp-proof-verify
+      - name: Smoke-test proof signature benchmarks
+        run: go test ./internal/crypto -run '^$' -bench 'Proof(Sign|Verify)$' -benchtime=1x -benchmem
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
