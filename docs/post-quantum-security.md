@@ -55,16 +55,149 @@ curl http://127.0.0.1:8080/drp/v1/proofs/REQUEST_ID:proof/verify
 
 The endpoint checks integrity against the currently configured signer. This is a node-local trust check, not a global public-key directory or consensus-level identity system; external clients still need an authenticated, independently trusted node public key. Only one proof signer is configured per node in this prototype.
 
+## Independent proof verification, rotation, and revocation
+
+The node exposes its current public signing metadata at `GET /drp/v1/node/identity`. This endpoint is for discovery only: its response is **not self-authenticating**. Confirm the signer ID, algorithm, public key, and SHA-256 key fingerprint through a trusted channel before trusting it.
+
+Proofs include `signerKeyId`, the SHA-256 fingerprint of the raw public key. Create a trusted bundle on the verifier machine at `trusted-keys.json` after independently confirming the public key. Example format:
+
+```json
+{
+  "version": "1",
+  "keys": [
+    {
+      "signerId": "drp-node-1",
+      "keyId": "<64-character-lowercase-SHA256-fingerprint>",
+      "algorithm": "ML-DSA-44",
+      "publicKey": "<base64url-encoded-public-key>",
+      "revoked": false
+    }
+  ]
+}
+```
+
+The key ID must be the SHA-256 fingerprint of the decoded raw public-key bytes. The public key must be base64url-encoded without padding. Keep the bundle in a controlled configuration system and distribute changes through an authenticated channel; never accept an arbitrary bundle supplied alongside an untrusted proof.
+
+Save a proof response as `proof.json`, then verify it independently:
+
+```bash
+go run ./cmd/drp-proof-verify ./proof.json ./trusted-keys.json
+```
+
+The verifier does not need to call the node that created the proof. A successful result means the signature matches a key trusted by the local bundle and that the key is not marked revoked or outside its validity window. It does not prove the underlying claim is factually true.
+
+### Key rotation
+
+1. Generate a new ML-DSA-44 key pair and back up the new private key before deployment.
+2. Authenticate the new public key and fingerprint independently.
+3. Add the new key as another entry in the trusted bundle, retaining the old key during the planned transition.
+4. Configure the node to use the new key and verify a fresh proof with the updated bundle.
+5. Once clients have the new key, mark the old key `"revoked": true` in the bundle and distribute the update through the authenticated channel.
+
+### Revocation
+
+To revoke a key, mark its trusted-bundle entry `"revoked": true`. The standalone verifier rejects proofs signed by that key. This prototype uses immediate revocation, so it also rejects historical proofs signed by the revoked key; production needs a specified historical-validation policy and trusted timestamps. Revocation only takes effect for verifiers that have received the updated bundle.
+
 ## Test it
 
 From the repository root:
 
 ```bash
-go test ./internal/pqc ./internal/crypto ./internal/network ./cmd/drp-pqc
+go test ./internal/pqc ./internal/crypto ./internal/network ./internal/trust ./cmd/drp-pqc ./cmd/drp-proof-verify
 go test ./...
 go build ./cmd/drpd
 go build ./cmd/drp
 go build ./cmd/drp-pqc
+go build ./cmd/drp-proof-verify
+go test ./internal/crypto -run '^
+```
+
+Create a local proof fixture:
+
+```bash
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"VERIFIED"}\n' > /tmp/drp-proof.json
+```
+
+Generate a test key pair (the utility will not overwrite existing files):
+
+```bash
+go run ./cmd/drp-pqc keygen /tmp/drp-test-private.key /tmp/drp-test-public.key
+```
+
+Sign the fixture and verify it:
+
+```bash
+go run ./cmd/drp-pqc sign /tmp/drp-test-private.key /tmp/drp-proof.json /tmp/drp-proof.sig
+go run ./cmd/drp-pqc verify /tmp/drp-test-public.key /tmp/drp-proof.json /tmp/drp-proof.sig
+```
+
+Expected final line:
+
+```text
+VALID: ML-DSA-44 signature verified
+```
+
+Test tamper detection:
+
+```bash
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"REVOKED"}\n' > /tmp/drp-proof-tampered.json
+go run ./cmd/drp-pqc verify /tmp/drp-test-public.key /tmp/drp-proof-tampered.json /tmp/drp-proof.sig
+```
+
+The final command should fail with an invalid-signature result.
+
+## Important security boundaries
+
+- This is a **cryptographic prototype**, not a claim that the entire DRP network is quantum-secure.
+- ML-DSA-44 can sign generated proof envelopes when explicitly configured. Ed25519 remains the default development fallback and uses an ephemeral key; do not use that fallback for durable production proofs.
+- This does not yet integrate PQC into consensus, peer transport, wallets, or blockchain transactions. Public-key discovery is implemented, but authenticated key distribution remains an operational responsibility. Production key management, historical revocation policy, and independent cryptographic review remain necessary.
+- The current JSON serialization approach is a prototype and should not be treated as a cross-language canonical signing format.
+- Keep private keys out of source control and logs. Review the library's production-readiness guidance before deploying cryptography in production.
+ -bench 'Proof(Sign|Verify)
+```
+
+Create a local proof fixture:
+
+```bash
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"VERIFIED"}\n' > /tmp/drp-proof.json
+```
+
+Generate a test key pair (the utility will not overwrite existing files):
+
+```bash
+go run ./cmd/drp-pqc keygen /tmp/drp-test-private.key /tmp/drp-test-public.key
+```
+
+Sign the fixture and verify it:
+
+```bash
+go run ./cmd/drp-pqc sign /tmp/drp-test-private.key /tmp/drp-proof.json /tmp/drp-proof.sig
+go run ./cmd/drp-pqc verify /tmp/drp-test-public.key /tmp/drp-proof.json /tmp/drp-proof.sig
+```
+
+Expected final line:
+
+```text
+VALID: ML-DSA-44 signature verified
+```
+
+Test tamper detection:
+
+```bash
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"REVOKED"}\n' > /tmp/drp-proof-tampered.json
+go run ./cmd/drp-pqc verify /tmp/drp-test-public.key /tmp/drp-proof-tampered.json /tmp/drp-proof.sig
+```
+
+The final command should fail with an invalid-signature result.
+
+## Important security boundaries
+
+- This is a **cryptographic prototype**, not a claim that the entire DRP network is quantum-secure.
+- ML-DSA-44 can sign generated proof envelopes when explicitly configured. Ed25519 remains the default development fallback and uses an ephemeral key; do not use that fallback for durable production proofs.
+- This does not yet integrate PQC into consensus, peer transport, wallets, or blockchain transactions. Node identity discovery, independently trusted public-key distribution, key rotation/revocation, and a production key-management service remain future work.
+- The current JSON serialization approach is a prototype and should not be treated as a cross-language canonical signing format.
+- Keep private keys out of source control and logs. Review the library's production-readiness guidance before deploying cryptography in production.
+ -benchmem
 ```
 
 Create a local proof fixture:
