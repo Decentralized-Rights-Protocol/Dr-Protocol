@@ -1,6 +1,6 @@
 {
   "name": "drp-protocol-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Command-line client for the Decentralized Rights Protocol verification network",
   "license": "MIT",
   "type": "module",
@@ -12,6 +12,9 @@
     "README.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "node --test"
+  },
   "engines": {
     "node": ">=18.18.0"
   },
@@ -19,7 +22,6 @@
     "drp",
     "decentralized-rights-protocol",
     "verification",
-    "blockchain",
     "cli"
   ],
   "repository": {
