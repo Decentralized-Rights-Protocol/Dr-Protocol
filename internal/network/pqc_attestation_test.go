@@ -73,7 +73,7 @@ func TestPostQuantumAttestationAlgorithmMustMatchRegistry(t *testing.T) {
 	s := New(store.New())
 	s.Registry.Register(Verifier{
 		ID: "verifier-pqc-2",
-		PublicKey: base64.RawURLEncoding.EncodeToString(pqcPublicKey),
+		PublicKey: base64.RawURLEncoding.EncodeToString(edPublicKey),
 		SignatureAlgorithm: drpcrypto.SignatureAlgorithmMLDSA44,
 		Active: true,
 	})
