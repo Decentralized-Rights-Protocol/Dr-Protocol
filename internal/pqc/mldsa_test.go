@@ -64,7 +64,7 @@ func TestMLDSARejectsTamperedSignature(t *testing.T) {
 }
 
 func TestMLDSARejectsWrongKeyAndEmptyPrivateKey(t *testing.T) {
-	publicKey, privateKey, err := GenerateKey()
+	_, privateKey, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
