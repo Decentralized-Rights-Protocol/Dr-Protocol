@@ -2,6 +2,8 @@ package network
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"net/http/httptest"
@@ -62,33 +64,37 @@ func TestPostQuantumAttestationAcceptedForRegisteredVerifier(t *testing.T) {
 }
 
 func TestPostQuantumAttestationAlgorithmMustMatchRegistry(t *testing.T) {
-	publicKey, _, err := pqc.GenerateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	pqcPublicKey, _, err := pqc.GenerateKey()
+	if err != nil { t.Fatal(err) }
+	// Construct a genuinely valid Ed25519 envelope while registering this verifier
+	// for ML-DSA-44. This proves the registry mismatch guard itself is exercised.
+	edPublicKey, edPrivateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil { t.Fatal(err) }
 	s := New(store.New())
 	s.Registry.Register(Verifier{
 		ID: "verifier-pqc-2",
-		PublicKey: base64.RawURLEncoding.EncodeToString(publicKey),
+		PublicKey: base64.RawURLEncoding.EncodeToString(pqcPublicKey),
 		SignatureAlgorithm: drpcrypto.SignatureAlgorithmMLDSA44,
 		Active: true,
 	})
 	a := protocol.Attestation{
-		ID: "attestation-mismatch",
-		VerifierID: "verifier-pqc-2",
-		SignatureAlgorithm: drpcrypto.SignatureAlgorithmEd25519,
-		ClaimID: "claim-2",
+		Version: "0.1", ID: "attestation-mismatch", VerifierID: "verifier-pqc-2",
+		SignatureAlgorithm: drpcrypto.SignatureAlgorithmEd25519, ClaimID: "claim-2",
 		Decision: protocol.StatusVerified,
-		Signature: "invalid",
+		CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
+	payload, err := json.Marshal(a)
+	if err != nil { t.Fatal(err) }
+	a.Signature = base64.RawURLEncoding.EncodeToString(ed25519.Sign(edPrivateKey, payload))
 	body, err := json.Marshal(a)
-	if err != nil {
-		t.Fatal(err)
-	}
+	if err != nil { t.Fatal(err) }
 	req := httptest.NewRequest("POST", "/drp/v1/attestations", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
 	if rec.Code != 401 {
 		t.Fatalf("expected 401 for algorithm mismatch, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := s.Store.GetAttestations("claim-2"); len(got) != 0 {
+		t.Fatalf("algorithm-mismatched attestation was stored: %d", len(got))
 	}
 }
