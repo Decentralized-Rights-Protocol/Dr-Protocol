@@ -10,6 +10,8 @@ This branch adds an experimental post-quantum digital-signature path using **ML-
 - Preserve legacy Ed25519 attestations when `signatureAlgorithm` is omitted; omitted algorithms default to `Ed25519`.
 - Reject unknown algorithms, malformed keys, modified messages/signatures, non-canonical signature lengths, and attestation algorithms that do not match the verifier registry.
 - Domain-separate ML-DSA signatures with `DRP-POAT-PROOF-v1`.
+- Sign generated proof envelopes with either the compatibility Ed25519 signer or a configured ML-DSA-44 node signer.
+- Include `signatureAlgorithm` and `signerId` in new proof envelopes and expose `GET /drp/v1/proofs/{proofId}/verify` for integrity verification against the node's configured signer.
 
 ## Attestation integration
 
