@@ -69,6 +69,7 @@ type Attestation struct {
 	Version string `json:"version"`
 	ID string `json:"id"`
 	VerifierID string `json:"verifierId"`
+	SignatureAlgorithm string `json:"signatureAlgorithm,omitempty"`
 	ClaimID string `json:"claimId"`
 	Decision Status `json:"decision"`
 	Reason string `json:"reason,omitempty"`
