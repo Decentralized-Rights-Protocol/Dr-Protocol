@@ -104,3 +104,26 @@ func TestMLDSAKeyEncodingRoundTrip(t *testing.T) {
 		t.Fatal("generated empty key encoding")
 	}
 }
+
+func TestMLDSARejectsAppendedSignatureBytes(t *testing.T) {
+	publicKey, privateKey, err := GenerateKey()
+	if err != nil { t.Fatal(err) }
+	message := []byte("proof")
+	signature, err := Sign(privateKey, message)
+	if err != nil { t.Fatal(err) }
+	appended := append(append([]byte(nil), signature...), 0x00)
+	if valid, err := Verify(publicKey, message, appended); err == nil || valid {
+		t.Fatal("Verify() accepted a signature with appended bytes")
+	}
+}
+
+func TestMLDSARejectsTruncatedSignature(t *testing.T) {
+	publicKey, privateKey, err := GenerateKey()
+	if err != nil { t.Fatal(err) }
+	message := []byte("proof")
+	signature, err := Sign(privateKey, message)
+	if err != nil { t.Fatal(err) }
+	if valid, err := Verify(publicKey, message, signature[:len(signature)-1]); err == nil || valid {
+		t.Fatal("Verify() accepted a truncated signature")
+	}
+}
