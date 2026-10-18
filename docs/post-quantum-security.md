@@ -44,7 +44,7 @@ go build ./cmd/drp-pqc
 Create a local proof fixture:
 
 ```bash
-printf '{"protocol":"DRP","claimId":"claim-test-001","status":"VERIFIED"}\\n' > /tmp/drp-proof.json
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"VERIFIED"}\n' > /tmp/drp-proof.json
 ```
 
 Generate a test key pair (the utility will not overwrite existing files):
@@ -69,7 +69,7 @@ VALID: ML-DSA-44 signature verified
 Test tamper detection:
 
 ```bash
-printf '{"protocol":"DRP","claimId":"claim-test-001","status":"REVOKED"}\\n' > /tmp/drp-proof-tampered.json
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"REVOKED"}\n' > /tmp/drp-proof-tampered.json
 go run ./cmd/drp-pqc verify /tmp/drp-test-public.key /tmp/drp-proof-tampered.json /tmp/drp-proof.sig
 ```
 
