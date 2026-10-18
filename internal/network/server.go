@@ -42,6 +42,18 @@ func(s *Server) attestations(w http.ResponseWriter,r *http.Request){
 	found:=false
 	for _,v:=range s.Registry.List(){if v.ID==a.VerifierID{verifier=v;found=true;break}}
 	if !found||!verifier.Active||verifier.PublicKey==""{writeJSON(w,403,map[string]string{"error":"verifier is not registered, active, or missing public key"});return}
+	attestationAlgorithm := a.SignatureAlgorithm
+	if attestationAlgorithm == "" {
+		attestationAlgorithm = drpcrypto.SignatureAlgorithmEd25519
+	}
+	verifierAlgorithm := verifier.SignatureAlgorithm
+	if verifierAlgorithm == "" {
+		verifierAlgorithm = drpcrypto.SignatureAlgorithmEd25519
+	}
+	if attestationAlgorithm != verifierAlgorithm {
+		writeJSON(w, 401, map[string]string{"error": "attestation signature algorithm does not match registered verifier"})
+		return
+	}
 	if !drpcrypto.VerifyAttestation(a,verifier.PublicKey){writeJSON(w,401,map[string]string{"error":"invalid attestation signature"});return}
 	s.Store.PutAttestation(a); writeJSON(w,201,a)
 }
