@@ -4,6 +4,7 @@ package pqc
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 
 	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
 )
@@ -50,12 +51,16 @@ func Sign(privateKey, message []byte) ([]byte, error) {
 	return signature, nil
 }
 
-// Verify checks a signature over the exact message bytes. It returns an error
-// for malformed public keys and valid=false for a well-formed key with a bad
-// signature.
+// Verify checks a signature over the exact message bytes. It rejects non-canonical
+// signature lengths before calling the crypto library, preventing trailing-byte
+// malleability. It returns an error for malformed public keys and valid=false for
+// a well-formed key with a bad signature.
 func Verify(publicKey, message, signature []byte) (valid bool, err error) {
 	if len(publicKey) == 0 {
 		return false, errors.New("public key is empty")
+	}
+	if len(signature) != mldsa44.SignatureSize {
+		return false, fmt.Errorf("invalid ML-DSA-44 signature length: got %d, want %d", len(signature), mldsa44.SignatureSize)
 	}
 	var public mldsa44.PublicKey
 	if err := public.UnmarshalBinary(publicKey); err != nil {
