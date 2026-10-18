@@ -64,8 +64,6 @@ func TestPostQuantumAttestationAcceptedForRegisteredVerifier(t *testing.T) {
 }
 
 func TestPostQuantumAttestationAlgorithmMustMatchRegistry(t *testing.T) {
-	pqcPublicKey, _, err := pqc.GenerateKey()
-	if err != nil { t.Fatal(err) }
 	// Construct a genuinely valid Ed25519 envelope while registering this verifier
 	// for ML-DSA-44. This proves the registry mismatch guard itself is exercised.
 	edPublicKey, edPrivateKey, err := ed25519.GenerateKey(rand.Reader)
