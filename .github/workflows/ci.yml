@@ -26,27 +26,7 @@ jobs:
       - name: Build independent proof verifier
         run: go build ./cmd/drp-proof-verify
       - name: Smoke-test proof signature benchmarks
-        run: go test ./internal/crypto -run '^
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Test npm CLI
-        working-directory: npm-cli
-        run: |
-          node --check src/index.js
-          npm test
-          npm pack --dry-run
- -bench 'Proof(Sign|Verify)
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Test npm CLI
-        working-directory: npm-cli
-        run: |
-          node --check src/index.js
-          npm test
-          npm pack --dry-run
- -benchtime=1x -benchmem
+        run: go test ./internal/crypto -run '^$' -bench 'Proof(Sign|Verify)$' -benchtime=1x -benchmem
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
