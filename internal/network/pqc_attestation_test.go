@@ -98,3 +98,38 @@ func TestPostQuantumAttestationAlgorithmMustMatchRegistry(t *testing.T) {
 		t.Fatalf("algorithm-mismatched attestation was stored: %d", len(got))
 	}
 }
+
+func TestPostQuantumAttestationRejectsMalleableSignatureWithoutStorage(t *testing.T) {
+	publicKey, privateKey, err := pqc.GenerateKey()
+	if err != nil { t.Fatal(err) }
+	s := New(store.New())
+	s.Registry.Register(Verifier{
+		ID: "verifier-pqc-malformed",
+		PublicKey: base64.RawURLEncoding.EncodeToString(publicKey),
+		SignatureAlgorithm: drpcrypto.SignatureAlgorithmMLDSA44,
+		Active: true,
+	})
+	a := protocol.Attestation{
+		Version: "0.1", ID: "attestation-appended-byte", VerifierID: "verifier-pqc-malformed",
+		SignatureAlgorithm: drpcrypto.SignatureAlgorithmMLDSA44, ClaimID: "claim-malformed",
+		Decision: protocol.StatusVerified,
+		CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+	}
+	payload, err := json.Marshal(a)
+	if err != nil { t.Fatal(err) }
+	signature, err := pqc.Sign(privateKey, payload)
+	if err != nil { t.Fatal(err) }
+	signature = append(signature, 0x00)
+	a.Signature = base64.RawURLEncoding.EncodeToString(signature)
+	body, err := json.Marshal(a)
+	if err != nil { t.Fatal(err) }
+	req := httptest.NewRequest("POST", "/drp/v1/attestations", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != 401 {
+		t.Fatalf("expected 401 for appended signature byte, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := s.Store.GetAttestations("claim-malformed"); len(got) != 0 {
+		t.Fatalf("invalid attestation was stored: %d", len(got))
+	}
+}
