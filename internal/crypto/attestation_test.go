@@ -1,6 +1,8 @@
 package crypto
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"testing"
@@ -47,5 +49,21 @@ func TestVerifyAttestationRejectsUnknownAlgorithm(t *testing.T) {
 	a := protocol.Attestation{SignatureAlgorithm: "UNKNOWN", Signature: "c2ln"}
 	if VerifyAttestation(a, "cHVi") {
 		t.Fatal("VerifyAttestation accepted an unknown signature algorithm")
+	}
+}
+
+func TestVerifyLegacyEd25519AttestationWithoutAlgorithm(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil { t.Fatal(err) }
+	a := protocol.Attestation{
+		Version: "0.1", ID: "attestation-legacy", VerifierID: "verifier-legacy",
+		ClaimID: "claim-legacy", Decision: protocol.StatusVerified,
+		CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+	}
+	payload, err := json.Marshal(a)
+	if err != nil { t.Fatal(err) }
+	a.Signature = base64.RawURLEncoding.EncodeToString(ed25519.Sign(privateKey, payload))
+	if !VerifyAttestation(a, base64.RawURLEncoding.EncodeToString(publicKey)) {
+		t.Fatal("legacy Ed25519 attestation without algorithm was rejected")
 	}
 }
