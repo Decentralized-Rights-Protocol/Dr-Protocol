@@ -3,7 +3,9 @@ package crypto
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 )
 
 type Signer struct {
@@ -30,6 +32,7 @@ func Verify(pub ed25519.PublicKey, data []byte, encoded string) bool {
 func (s *Signer) Algorithm() string { return SignatureAlgorithmEd25519 }
 func (s *Signer) SignerID() string { return "node-local" }
 func (s *Signer) PublicKeyEncoded() string { return base64.RawURLEncoding.EncodeToString(s.Public) }
+func (s *Signer) KeyID() string { sum := sha256.Sum256(s.Public); return hex.EncodeToString(sum[:]) }
 func (s *Signer) SignProof(payload []byte) (string, error) { return s.Sign(payload), nil }
 func (s *Signer) VerifyProof(payload []byte, signature string) bool {
 	return Verify(s.Public, payload, signature)
