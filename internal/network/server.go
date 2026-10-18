@@ -63,7 +63,7 @@ func(s *Server) verify(w http.ResponseWriter,r *http.Request){
 	proof:=protocol.Proof{
 		Version:protocol.Version, ID:req.ID+":proof", ClaimDigest:digest,
 		PolicyDigest:policyDigest, EvidenceDigests:evidenceDigests, Result:result,
-		SignatureAlgorithm:s.Signer.Algorithm(), SignerID:s.Signer.SignerID(), CreatedAt:time.Now().UTC(),
+		SignatureAlgorithm:s.Signer.Algorithm(), SignerID:s.Signer.SignerID(), SignerKeyID:s.Signer.KeyID(), CreatedAt:time.Now().UTC(),
 	}
 	payload,err:=protocol.ProofSigningBytes(proof)
 	if err!=nil{writeJSON(w,500,map[string]string{"error":"could not serialize proof"});return}
@@ -111,7 +111,7 @@ func(s *Server) proof(w http.ResponseWriter,r *http.Request){
 	payload,err:=protocol.ProofSigningBytes(p)
 	trustedSigner:=p.SignerID==s.Signer.SignerID() && p.SignatureAlgorithm==s.Signer.Algorithm()
 	valid:=err==nil && trustedSigner && s.Signer.VerifyProof(payload,p.Signature)
-	writeJSON(w,200,map[string]any{"proofId":p.ID,"valid":valid,"trustedSigner":trustedSigner,"signerId":p.SignerID,"signatureAlgorithm":p.SignatureAlgorithm})
+	writeJSON(w,200,map[string]any{"proofId":p.ID,"valid":valid,"trustedSigner":trustedSigner,"signerId":p.SignerID,"signerKeyId":p.SignerKeyID,"signatureAlgorithm":p.SignatureAlgorithm})
 }
 
 func(s *Server) verifiers(w http.ResponseWriter,r *http.Request){
