@@ -35,6 +35,7 @@ func NewWithProofSigner(s *store.Store, signer drpcrypto.ProofSigner) *Server {
 func(s *Server) Handler() http.Handler {
 	mux:=http.NewServeMux()
 	mux.HandleFunc("/health",s.health)
+	mux.HandleFunc("/drp/v1/node/identity",s.nodeIdentity)
 	mux.HandleFunc("/drp/v1/verify",s.verify)
 	mux.HandleFunc("/drp/v1/proofs/",s.proof)
 	mux.HandleFunc("/drp/v1/claims/",s.claim)
@@ -42,6 +43,18 @@ func(s *Server) Handler() http.Handler {
 	mux.HandleFunc("/drp/v1/peers",s.peers)
 	mux.HandleFunc("/drp/v1/attestations",s.attestations)
 	return mux
+}
+
+// nodeIdentity publishes signing-key metadata. Clients must authenticate
+// this information independently before adding it to a trust bundle.
+func(s *Server) nodeIdentity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" { writeJSON(w,405,map[string]string{"error":"method not allowed"}); return }
+	writeJSON(w,200,map[string]any{
+		"protocol":"DRP", "signerId":s.Signer.SignerID(),
+		"signatureAlgorithm":s.Signer.Algorithm(), "signerKeyId":s.Signer.KeyID(),
+		"publicKey":s.Signer.PublicKeyEncoded(),
+		"warning":"public key metadata is not self-authenticating; verify signer identity out-of-band before trusting it",
+	})
 }
 
 func(s *Server) health(w http.ResponseWriter,_ *http.Request){
