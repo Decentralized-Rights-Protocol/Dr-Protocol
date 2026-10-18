@@ -34,10 +34,6 @@ func NewMLDSAProofSigner(id string, publicKey, privateKey []byte) (*MLDSAProofSi
 	if _, err := pqc.Sign(privateKey, []byte("DRP proof signer key validation")); err != nil {
 		return nil, errors.New("invalid ML-DSA-44 private key")
 	}
-	if _, err := pqc.Verify(publicKey, []byte("DRP proof signer key validation"), make([]byte, 0)); err == nil {
-		// A zero-length signature is intentionally invalid; successful parsing
-		// is checked separately below by verifying a real signature.
-	}
 	sig, err := pqc.Sign(privateKey, []byte("DRP proof signer key validation"))
 	if err != nil {
 		return nil, err
