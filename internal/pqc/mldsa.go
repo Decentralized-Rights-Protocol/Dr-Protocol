@@ -57,6 +57,11 @@ func Verify(publicKey, message, signature []byte) (valid bool, err error) {
 	if len(publicKey) == 0 {
 		return false, errors.New("public key is empty")
 	}
+	// ML-DSA signatures have a fixed encoding. Reject extra or missing bytes
+	// before calling the crypto library to avoid signature malleability.
+	if len(signature) != mldsa44.SignatureSize {
+		return false, errors.New("invalid ML-DSA-44 signature length")
+	}
 	var public mldsa44.PublicKey
 	if err := public.UnmarshalBinary(publicKey); err != nil {
 		return false, errors.New("invalid ML-DSA-44 public key")
