@@ -114,7 +114,7 @@ func run(args []string) error {
 		}
 		if !valid {
 			fmt.Println("INVALID: signature does not match this message and public key")
-			os.Exit(1)
+			return fmt.Errorf("invalid signature")
 		}
 		fmt.Printf("VALID: %s signature verified\n", pqc.Algorithm)
 		return nil
