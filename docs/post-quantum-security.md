@@ -8,7 +8,7 @@ This branch adds an experimental post-quantum digital-signature path using **ML-
 - Verify ML-DSA-44 signatures on DRP verifier attestations submitted to `POST /drp/v1/attestations`.
 - Bind each verifier's registered `signatureAlgorithm` to the algorithm declared by each attestation.
 - Preserve legacy Ed25519 attestations when `signatureAlgorithm` is omitted; omitted algorithms default to `Ed25519`.
-- Reject unknown algorithms, malformed keys, modified messages/signatures, and attestation algorithms that do not match the verifier registry.
+- Reject unknown algorithms, malformed keys, modified messages/signatures, non-canonical signature lengths, and attestation algorithms that do not match the verifier registry.
 - Domain-separate ML-DSA signatures with `DRP-POAT-PROOF-v1`.
 
 ## Attestation integration
@@ -44,7 +44,7 @@ go build ./cmd/drp-pqc
 Create a local proof fixture:
 
 ```bash
-printf '{"protocol":"DRP","claimId":"claim-test-001","status":"VERIFIED"}\\n' > /tmp/drp-proof.json
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"VERIFIED"}\n' > /tmp/drp-proof.json
 ```
 
 Generate a test key pair (the utility will not overwrite existing files):
@@ -69,7 +69,7 @@ VALID: ML-DSA-44 signature verified
 Test tamper detection:
 
 ```bash
-printf '{"protocol":"DRP","claimId":"claim-test-001","status":"REVOKED"}\\n' > /tmp/drp-proof-tampered.json
+printf '{"protocol":"DRP","claimId":"claim-test-001","status":"REVOKED"}\n' > /tmp/drp-proof-tampered.json
 go run ./cmd/drp-pqc verify /tmp/drp-test-public.key /tmp/drp-proof-tampered.json /tmp/drp-proof.sig
 ```
 
@@ -78,16 +78,7 @@ The final command should fail with an invalid-signature result.
 ## Important security boundaries
 
 - This is a **cryptographic prototype**, not a claim that the entire DRP network is quantum-secure.
-- ML-DSA is now wired into verifier-attestation signature validation, but the network's own generated `Proof` objects are still signed with the existing Ed25519 signer. This is an intentional first integration step; proof signing needs an explicit key lifecycle/configuration and migration design.
-- This does not yet integrate ML-DSA into verifier identity issuance, wallets, consensus, blockchain transactions, or the Cosmos chain.
-- ML-DSA is a digital-signature algorithm; it does not encrypt files or establish shared secrets. A separate standardized KEM such as ML-KEM is needed for key establishment/encryption workflows.
-- The private key utility writes mode `0600` on POSIX systems, but filesystem permissions are not a substitute for secure key storage. Do not use it to protect production keys.
-- CIRCL describes itself as an experimental cryptographic library and recommends caution for production use. Independent cryptographic review, interoperability tests, key lifecycle/revocation design, canonical serialization, and threat modelling are required before production use.
-
-## Next integration phases
-
-1. Define a versioned canonical DRP proof/attestation envelope and stable key identifiers.
-2. Add configurable ML-DSA proof signing and verification, with explicit algorithm metadata and backwards-compatible Ed25519 handling.
-3. Define verifier key registration, rotation, revocation, and recovery rules.
-4. Benchmark signature sizes and verification costs for mobile devices, low-bandwidth nodes, and block storage.
-5. Evaluate a hybrid migration strategy for existing classical signatures without pretending the old keys themselves become quantum-resistant.
+- ML-DSA is wired into verifier-attestation signature validation. The network's own generated `Proof` objects still use the existing Ed25519 signer; migrating proof signing requires an explicit key lifecycle and compatibility design.
+- This does not yet integrate PQC into consensus, peer transport, wallets, or blockchain transactions.
+- The current JSON serialization approach is a prototype and should not be treated as a cross-language canonical signing format.
+- Keep private keys out of source control and logs. Review the library's production-readiness guidance before deploying cryptography in production.
