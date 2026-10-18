@@ -30,10 +30,7 @@ func NewMLDSAProofSigner(id string, publicKey, privateKey []byte) (*MLDSAProofSi
 	if id == "" || len(publicKey) == 0 || len(privateKey) == 0 {
 		return nil, errors.New("signer ID, public key, and private key are required")
 	}
-	// Validate both key encodings before accepting configuration.
-	if _, err := pqc.Sign(privateKey, []byte("DRP proof signer key validation")); err != nil {
-		return nil, errors.New("invalid ML-DSA-44 private key")
-	}
+	// Sign and verify a challenge to validate both encodings and ensure the keys match.
 	sig, err := pqc.Sign(privateKey, []byte("DRP proof signer key validation"))
 	if err != nil {
 		return nil, err
