@@ -1,7 +1,9 @@
 package crypto
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 
 	"github.com/Decentralized-Rights-Protocol/Dr-Protocol/internal/pqc"
@@ -14,6 +16,7 @@ type ProofSigner interface {
 	Algorithm() string
 	SignerID() string
 	PublicKeyEncoded() string
+	KeyID() string
 	SignProof(payload []byte) (string, error)
 	VerifyProof(payload []byte, signature string) bool
 }
@@ -45,6 +48,7 @@ func NewMLDSAProofSigner(id string, publicKey, privateKey []byte) (*MLDSAProofSi
 func (s *MLDSAProofSigner) Algorithm() string { return SignatureAlgorithmMLDSA44 }
 func (s *MLDSAProofSigner) SignerID() string { return s.id }
 func (s *MLDSAProofSigner) PublicKeyEncoded() string { return base64.RawURLEncoding.EncodeToString(s.publicKey) }
+func (s *MLDSAProofSigner) KeyID() string { sum := sha256.Sum256(s.publicKey); return hex.EncodeToString(sum[:]) }
 func (s *MLDSAProofSigner) SignProof(payload []byte) (string, error) {
 	sig, err := pqc.Sign(s.privateKey, payload)
 	if err != nil { return "", err }
