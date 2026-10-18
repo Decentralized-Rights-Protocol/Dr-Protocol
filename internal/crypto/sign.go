@@ -25,3 +25,12 @@ func Verify(pub ed25519.PublicKey, data []byte, encoded string) bool {
 	sig, err := base64.RawURLEncoding.DecodeString(encoded)
 	return err == nil && ed25519.Verify(pub, data, sig)
 }
+
+// ProofSigner adapter methods keep existing Ed25519 proof verification compatible.
+func (s *Signer) Algorithm() string { return SignatureAlgorithmEd25519 }
+func (s *Signer) SignerID() string { return "node-local" }
+func (s *Signer) PublicKeyEncoded() string { return base64.RawURLEncoding.EncodeToString(s.Public) }
+func (s *Signer) SignProof(payload []byte) (string, error) { return s.Sign(payload), nil }
+func (s *Signer) VerifyProof(payload []byte, signature string) bool {
+	return Verify(s.Public, payload, signature)
+}
