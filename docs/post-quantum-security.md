@@ -31,6 +31,30 @@ A signed attestation includes `"signatureAlgorithm": "ML-DSA-44"`. The signature
 
 Do not use hand-built JSON strings for signing. Build the typed protocol object and use Go's JSON serialization consistently; a future protocol version should define a versioned canonical encoding before cross-language signing is treated as interoperable.
 
+## Configure persistent ML-DSA proof signing
+
+The node defaults to an ephemeral Ed25519 key for local compatibility. That key changes on restart, so proofs signed with it will not verify after a restart. For persistent ML-DSA-44 proof signing, generate a key pair and protect the private key:
+
+```bash
+umask 077
+go run ./cmd/drp-pqc keygen ./drp-node-private.key ./drp-node-public.key
+chmod 600 ./drp-node-private.key
+export DRP_NODE_ID=drp-node-1
+export DRP_PQC_PRIVATE_KEY_FILE=./drp-node-private.key
+export DRP_PQC_PUBLIC_KEY_FILE=./drp-node-public.key
+go run ./cmd/drpd --addr :8080
+```
+
+Both key-file variables must be set together. The node rejects private-key files with group/other permissions and checks that the public/private key pair matches. Keep the private key out of source control and back it up securely.
+
+Generated proofs include `signatureAlgorithm` and `signerId`. Verify a stored proof with:
+
+```bash
+curl http://127.0.0.1:8080/drp/v1/proofs/REQUEST_ID:proof/verify
+```
+
+The endpoint checks integrity against the currently configured signer. This is a node-local trust check, not a global public-key directory or consensus-level identity system; external clients still need an authenticated, independently trusted node public key. Only one proof signer is configured per node in this prototype.
+
 ## Test it
 
 From the repository root:
@@ -80,7 +104,7 @@ The final command should fail with an invalid-signature result.
 ## Important security boundaries
 
 - This is a **cryptographic prototype**, not a claim that the entire DRP network is quantum-secure.
-- ML-DSA is wired into verifier-attestation signature validation. The network's own generated `Proof` objects still use the existing Ed25519 signer; migrating proof signing requires an explicit key lifecycle and compatibility design.
-- This does not yet integrate PQC into consensus, peer transport, wallets, or blockchain transactions.
+- ML-DSA-44 can sign generated proof envelopes when explicitly configured. Ed25519 remains the default development fallback and uses an ephemeral key; do not use that fallback for durable production proofs.
+- This does not yet integrate PQC into consensus, peer transport, wallets, or blockchain transactions. Node identity discovery, independently trusted public-key distribution, key rotation/revocation, and a production key-management service remain future work.
 - The current JSON serialization approach is a prototype and should not be treated as a cross-language canonical signing format.
 - Keep private keys out of source control and logs. Review the library's production-readiness guidance before deploying cryptography in production.
