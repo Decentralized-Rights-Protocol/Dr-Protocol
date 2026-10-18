@@ -92,6 +92,7 @@ type Proof struct {
 	Version string `json:"version"`
 	SignatureAlgorithm string `json:"signatureAlgorithm,omitempty"`
 	SignerID string `json:"signerId,omitempty"`
+	SignerKeyID string `json:"signerKeyId,omitempty"`
 	ID string `json:"id"`
 	ClaimDigest string `json:"claimDigest"`
 	PolicyDigest string `json:"policyDigest"`
