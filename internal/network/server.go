@@ -122,7 +122,7 @@ func(s *Server) proof(w http.ResponseWriter,r *http.Request){
 	if !ok{writeJSON(w,404,map[string]string{"error":"proof not found"});return}
 	if !verifyOnly{writeJSON(w,200,p);return}
 	payload,err:=protocol.ProofSigningBytes(p)
-	trustedSigner:=p.SignerID==s.Signer.SignerID() && p.SignatureAlgorithm==s.Signer.Algorithm()
+	trustedSigner:=p.SignerID==s.Signer.SignerID() && p.SignatureAlgorithm==s.Signer.Algorithm() && p.SignerKeyID==s.Signer.KeyID()
 	valid:=err==nil && trustedSigner && s.Signer.VerifyProof(payload,p.Signature)
 	writeJSON(w,200,map[string]any{"proofId":p.ID,"valid":valid,"trustedSigner":trustedSigner,"signerId":p.SignerID,"signerKeyId":p.SignerKeyID,"signatureAlgorithm":p.SignatureAlgorithm})
 }
