@@ -36,11 +36,13 @@ func usage() {
 	fmt.Println("  drp consensus propose --file block.json [--endpoint http://localhost:8080]")
 	fmt.Println("  drp consensus vote --file vote.json [--endpoint http://localhost:8080]")
 	fmt.Println("  drp consensus commit [--endpoint http://localhost:8080]")
+	fmt.Println("  drp consensus certificate <height> [--endpoint http://localhost:8080]")
+	fmt.Println("  drp chain block <height> [--endpoint http://localhost:8080]")
 	fmt.Println("  drp chain status [--endpoint http://localhost:8080]")
 }
 
 func consensusCommand(args []string) error {
-	if len(args)==0 { return fmt.Errorf("expected status, propose, vote, or commit") }
+	if len(args)==0 { return fmt.Errorf("expected status, propose, vote, commit, or certificate") }
 	action := args[0]
 	fs := flag.NewFlagSet("drp consensus "+action,flag.ContinueOnError)
 	endpoint := fs.String("endpoint","http://localhost:8080","DRP node base URL")
@@ -55,13 +57,24 @@ func consensusCommand(args []string) error {
 		if *file=="" { return fmt.Errorf("--file is required") }
 		return postFile(*endpoint+"/drp/v1/consensus/votes",*file)
 	case "commit": return requestJSON(http.MethodPost,*endpoint+"/drp/v1/consensus/commit",bytes.NewReader([]byte("{}")))
+	case "certificate":
+		if fs.NArg()!=1 || fs.Arg(0)=="" { return fmt.Errorf("certificate requires a block height") }
+		return requestJSON(http.MethodGet,*endpoint+"/drp/v1/consensus/certificates/"+fs.Arg(0),nil)
 	default: return fmt.Errorf("unknown consensus action %q",action)
 	}
 }
 
 func chainCommand(args []string) error {
-	if len(args)==0 || args[0]!="status" { return fmt.Errorf("supported chain command: status") }
-	return consensusCommand(append([]string{"status"},args[1:]...))
+	if len(args)==0 { return fmt.Errorf("supported chain commands: status, block") }
+	if args[0]=="status" { return consensusCommand(append([]string{"status"},args[1:]...)) }
+	if args[0]=="block" {
+		fs:=flag.NewFlagSet("drp chain block",flag.ContinueOnError)
+		endpoint:=fs.String("endpoint","http://localhost:8080","DRP node base URL")
+		if err:=fs.Parse(args[1:]);err!=nil{return err}
+		if fs.NArg()!=1 { return fmt.Errorf("block requires a height") }
+		return requestJSON(http.MethodGet,*endpoint+"/drp/v1/consensus/blocks/"+fs.Arg(0),nil)
+	}
+	return fmt.Errorf("supported chain commands: status, block")
 }
 
 func postFile(url,path string) error {
