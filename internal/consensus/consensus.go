@@ -72,6 +72,20 @@ func New(validators map[string]ed25519.PublicKey) (*Engine, error) {
 
 func (e *Engine) Quorum() int { return (2*len(e.validators))/3 + 1 }
 
+// RestoreCommitted seeds a freshly constructed engine from the durable chain tip.
+// Startup code must validate the stored block and certificate before calling this.
+func (e *Engine) RestoreCommitted(block Block) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.last != nil || e.pending != nil { return errors.New("consensus: restore requires an empty engine") }
+	if block.Height == 0 { return ErrInvalidHeight }
+	if block.Height == 1 && block.PreviousHash != "" { return ErrInvalidHeight }
+	e.last = ptrBlock(cloneBlock(block))
+	return nil
+}
+
+func ptrBlock(b Block) *Block { return &b }
+
 func (e *Engine) LastCommitted() (Block, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
