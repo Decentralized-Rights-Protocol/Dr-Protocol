@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Decentralized-Rights-Protocol/Dr-Protocol/internal/consensus"
@@ -35,6 +36,22 @@ func (s *Server) consensusHandler(w http.ResponseWriter, r *http.Request) {
 		out := map[string]any{"configured":true,"quorum":s.Consensus.Engine.Quorum(),"votes":s.Consensus.Engine.VoteCount()}
 		if ok { out["height"] = block.Height; out["blockHash"] = block.Hash() } else { out["height"] = 0 }
 		writeJSON(w, http.StatusOK, out)
+	case strings.HasPrefix(r.URL.Path,"/drp/v1/consensus/blocks/") && r.Method == http.MethodGet:
+		if s.Consensus.Chain == nil { writeJSON(w,http.StatusServiceUnavailable,map[string]string{"error":"durable chain storage is not configured"}); return }
+		height, err := strconv.ParseUint(strings.TrimPrefix(r.URL.Path,"/drp/v1/consensus/blocks/"),10,64)
+		if err != nil || height == 0 { writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid block height"}); return }
+		block, ok, err := s.Consensus.Chain.Block(height)
+		if err != nil { writeJSON(w,http.StatusInternalServerError,map[string]string{"error":err.Error()}); return }
+		if !ok { writeJSON(w,http.StatusNotFound,map[string]string{"error":"block not found"}); return }
+		writeJSON(w,http.StatusOK,block)
+	case strings.HasPrefix(r.URL.Path,"/drp/v1/consensus/certificates/") && r.Method == http.MethodGet:
+		if s.Consensus.Chain == nil { writeJSON(w,http.StatusServiceUnavailable,map[string]string{"error":"durable chain storage is not configured"}); return }
+		height, err := strconv.ParseUint(strings.TrimPrefix(r.URL.Path,"/drp/v1/consensus/certificates/"),10,64)
+		if err != nil || height == 0 { writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid block height"}); return }
+		cert, ok, err := s.Consensus.Chain.Certificate(height)
+		if err != nil { writeJSON(w,http.StatusInternalServerError,map[string]string{"error":err.Error()}); return }
+		if !ok { writeJSON(w,http.StatusNotFound,map[string]string{"error":"certificate not found"}); return }
+		writeJSON(w,http.StatusOK,cert)
 	case r.URL.Path == "/drp/v1/consensus/proposals" && r.Method == http.MethodPost:
 		var block consensus.Block
 		if err := json.NewDecoder(http.MaxBytesReader(w,r.Body,1<<20)).Decode(&block); err != nil {
