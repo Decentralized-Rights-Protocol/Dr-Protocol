@@ -3,6 +3,7 @@
 package store
 
 import (
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,13 +51,8 @@ func (s *ChainStore) Block(height uint64) (consensus.Block, bool, error) {
 
 // CommitBlock atomically stores a block, its quorum certificate and the new tip.
 // It validates the chain extension against durable state before writing.
-func (s *ChainStore) CommitBlock(block consensus.Block, cert consensus.Certificate) error {
-	if err := consensus.VerifyCertificate(block,cert,nil); err != nil {
-		// Certificate verification requires the validator public-key set. This
-		// storage layer checks structural binding; callers must verify signatures
-		// against the configured validator set before calling CommitBlock.
-		if cert.BlockHash != block.Hash() { return fmt.Errorf("invalid certificate binding: %w",err) }
-	}
+func (s *ChainStore) CommitBlock(block consensus.Block, cert consensus.Certificate, validators map[string]ed25519.PublicKey) error {
+	if err := consensus.VerifyCertificate(block,cert,validators); err != nil { return fmt.Errorf("invalid commit certificate: %w",err) }
 	tip, exists, err := s.Tip()
 	if err != nil { return err }
 	expectedHeight, expectedParent := uint64(1), ""
