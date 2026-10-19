@@ -96,7 +96,7 @@ func (e *Engine) Propose(block Block) error {
 		if e.pending.Hash() == block.Hash() { return nil }
 		return errors.New("consensus: another proposal is already pending")
 	}
-	if block.TimestampUnix <= 0 { block.TimestampUnix = time.Now().Unix() }
+	if block.TimestampUnix <= 0 { return errors.New("consensus: block timestamp must be positive") }
 	copy := cloneBlock(block)
 	e.pending = &copy
 	e.votes = make(map[string]Vote)
@@ -127,7 +127,11 @@ func (e *Engine) VoteCount() int {
 	return len(e.votes)
 }
 
-func (e *Engine) Commit() (Block, Certificate, error) {
+func (e *Engine) Commit() (Block, Certificate, error) { return e.CommitWith(nil) }
+
+// CommitWith runs persist while the proposal and votes are locked, and only
+// advances in-memory consensus state if persistence succeeds. persist may be nil.
+func (e *Engine) CommitWith(persist func(Block, Certificate) error) (Block, Certificate, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.pending == nil { return Block{}, Certificate{}, ErrNoProposal }
@@ -139,6 +143,7 @@ func (e *Engine) Commit() (Block, Certificate, error) {
 	sort.Strings(ids)
 	for _, id := range ids { cert.Votes = append(cert.Votes, e.votes[id]) }
 	committed := cloneBlock(*e.pending)
+	if persist != nil { if err := persist(cloneBlock(committed), cert); err != nil { return Block{}, Certificate{}, fmt.Errorf("consensus: persist commit: %w", err) } }
 	e.last = &committed
 	e.pending = nil
 	e.votes = make(map[string]Vote)
