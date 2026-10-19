@@ -31,6 +31,7 @@ func main() {
 		if err != nil { log.Fatalf("load validators: %v", err) }
 		engine, err := consensus.New(validators)
 		if err != nil { log.Fatalf("initialize consensus: %v", err) }
+		if err := chain.ValidateChain(validators); err != nil { log.Fatalf("validate persisted chain: %v", err) }
 		if tip, ok, err := chain.Tip(); err != nil {
 			log.Fatalf("read chain tip: %v", err)
 		} else if ok {
