@@ -57,3 +57,18 @@ func TestRejectsWrongHeightAndParent(t *testing.T) {
 	engine, _ := New(pub)
 	if err := engine.Propose(Block{Height:2, TimestampUnix:1}); !errors.Is(err, ErrInvalidHeight) { t.Fatalf("got %v", err) }
 }
+
+func TestFailedPersistenceDoesNotAdvanceConsensus(t *testing.T) {
+	pub, priv := testValidators(t, 1)
+	engine, err := New(pub)
+	if err != nil { t.Fatal(err) }
+	block := Block{Height:1,TimestampUnix:1,Payload:[]byte("persist-failure")}
+	if err := engine.Propose(block); err != nil { t.Fatal(err) }
+	hash := block.Hash()
+	if err := engine.AddVote(Vote{ValidatorID:"a",BlockHash:hash,Signature:ed25519.Sign(priv["a"],[]byte(hash))}); err != nil { t.Fatal(err) }
+	_, _, err = engine.CommitWith(func(Block, Certificate) error { return errors.New("disk unavailable") })
+	if err == nil { t.Fatal("expected persistence failure") }
+	if _, ok := engine.LastCommitted(); ok { t.Fatal("engine advanced despite failed persistence") }
+	if err := engine.AddVote(Vote{ValidatorID:"a",BlockHash:hash,Signature:ed25519.Sign(priv["a"],[]byte(hash))}); err != nil { t.Fatalf("proposal should remain pending: %v",err) }
+	if _, _, err := engine.Commit(); err != nil { t.Fatalf("commit after retry should succeed: %v",err) }
+}
