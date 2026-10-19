@@ -36,8 +36,8 @@ func usage() {
 	fmt.Println("  drp consensus propose --file block.json [--endpoint http://localhost:8080]")
 	fmt.Println("  drp consensus vote --file vote.json [--endpoint http://localhost:8080]")
 	fmt.Println("  drp consensus commit [--endpoint http://localhost:8080]")
-	fmt.Println("  drp consensus certificate <height> [--endpoint http://localhost:8080]")
-	fmt.Println("  drp chain block <height> [--endpoint http://localhost:8080]")
+	fmt.Println("  drp consensus certificate [--endpoint http://localhost:8080] <height>")
+	fmt.Println("  drp chain block [--endpoint http://localhost:8080] <height>")
 	fmt.Println("  drp chain status [--endpoint http://localhost:8080]")
 }
 
