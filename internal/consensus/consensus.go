@@ -1,7 +1,6 @@
-// Package consensus implements the first deterministic DRP blockchain-consensus
-// primitive. It is an experimental single-height round engine, not a complete
-// production BFT protocol: networking, timeouts, view changes and durable WAL are
-// deliberately supplied by later integration layers.
+// Package consensus implements an experimental deterministic DRP consensus primitive.
+// It is not a complete production BFT protocol: networking, timeouts, view changes,
+// validator-set transitions, and a durable write-ahead log remain out of scope.
 package consensus
 
 import (
@@ -22,6 +21,7 @@ var (
 	ErrConflictingVote  = errors.New("consensus: validator already voted for another block")
 	ErrNoQuorum          = errors.New("consensus: quorum not reached")
 	ErrInvalidHeight     = errors.New("consensus: invalid block height or parent")
+	ErrInvalidCertificate = errors.New("consensus: invalid commit certificate")
 )
 
 type Block struct {
@@ -77,9 +77,15 @@ func (e *Engine) Quorum() int { return (2*len(e.validators))/3 + 1 }
 func (e *Engine) RestoreCommitted(block Block) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.last != nil || e.pending != nil { return errors.New("consensus: restore requires an empty engine") }
-	if block.Height == 0 { return ErrInvalidHeight }
-	if block.Height == 1 && block.PreviousHash != "" { return ErrInvalidHeight }
+	if e.last != nil || e.pending != nil {
+		return errors.New("consensus: restore requires an empty engine")
+	}
+	if block.Height == 0 || block.TimestampUnix <= 0 {
+		return ErrInvalidHeight
+	}
+	if block.Height == 1 && block.PreviousHash != "" {
+		return ErrInvalidHeight
+	}
 	e.last = ptrBlock(cloneBlock(block))
 	return nil
 }
@@ -89,7 +95,9 @@ func ptrBlock(b Block) *Block { return &b }
 func (e *Engine) LastCommitted() (Block, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.last == nil { return Block{}, false }
+	if e.last == nil {
+		return Block{}, false
+	}
 	return cloneBlock(*e.last), true
 }
 
@@ -106,10 +114,14 @@ func (e *Engine) Propose(block Block) error {
 		return ErrInvalidHeight
 	}
 	if e.pending != nil {
-		if e.pending.Hash() == block.Hash() { return nil }
+		if e.pending.Hash() == block.Hash() {
+			return nil
+		}
 		return errors.New("consensus: another proposal is already pending")
 	}
-	if block.TimestampUnix <= 0 { return errors.New("consensus: block timestamp must be positive") }
+	if block.TimestampUnix <= 0 {
+		return errors.New("consensus: block timestamp must be positive")
+	}
 	copy := cloneBlock(block)
 	e.pending = &copy
 	e.votes = make(map[string]Vote)
@@ -119,14 +131,20 @@ func (e *Engine) Propose(block Block) error {
 func (e *Engine) AddVote(v Vote) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.pending == nil { return ErrNoProposal }
+	if e.pending == nil {
+		return ErrNoProposal
+	}
 	key, ok := e.validators[v.ValidatorID]
-	if !ok { return ErrUnknownValidator }
+	if !ok {
+		return ErrUnknownValidator
+	}
 	if v.BlockHash != e.pending.Hash() || !ed25519.Verify(key, []byte(v.BlockHash), v.Signature) {
 		return ErrInvalidSignature
 	}
 	if previous, exists := e.votes[v.ValidatorID]; exists {
-		if previous.BlockHash != v.BlockHash { return ErrConflictingVote }
+		if previous.BlockHash != v.BlockHash {
+			return ErrConflictingVote
+		}
 		return nil
 	}
 	v.Signature = append([]byte(nil), v.Signature...)
@@ -147,36 +165,71 @@ func (e *Engine) Commit() (Block, Certificate, error) { return e.CommitWith(nil)
 func (e *Engine) CommitWith(persist func(Block, Certificate) error) (Block, Certificate, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.pending == nil { return Block{}, Certificate{}, ErrNoProposal }
-	if len(e.votes) < e.Quorum() { return Block{}, Certificate{}, ErrNoQuorum }
+	if e.pending == nil {
+		return Block{}, Certificate{}, ErrNoProposal
+	}
+	if len(e.votes) < e.Quorum() {
+		return Block{}, Certificate{}, ErrNoQuorum
+	}
 	hash := e.pending.Hash()
 	cert := Certificate{BlockHash: hash, Votes: make([]Vote, 0, len(e.votes))}
 	ids := make([]string, 0, len(e.votes))
-	for id := range e.votes { ids = append(ids, id) }
+	for id := range e.votes {
+		ids = append(ids, id)
+	}
 	sort.Strings(ids)
-	for _, id := range ids { cert.Votes = append(cert.Votes, e.votes[id]) }
+	for _, id := range ids {
+		vote := e.votes[id]
+		vote.Signature = append([]byte(nil), vote.Signature...)
+		cert.Votes = append(cert.Votes, vote)
+	}
 	committed := cloneBlock(*e.pending)
-	if persist != nil { if err := persist(cloneBlock(committed), cert); err != nil { return Block{}, Certificate{}, fmt.Errorf("consensus: persist commit: %w", err) } }
+	if persist != nil {
+		if err := persist(cloneBlock(committed), cert); err != nil {
+			return Block{}, Certificate{}, fmt.Errorf("consensus: persist commit: %w", err)
+		}
+	}
 	e.last = &committed
 	e.pending = nil
 	e.votes = make(map[string]Vote)
 	return cloneBlock(committed), cert, nil
 }
 
+// VerifyCertificate strictly validates a certificate. Every included vote must be
+// from a known validator, unique, bound to this block, and cryptographically valid.
+// Rejecting invalid extras prevents callers from accidentally accepting a malformed
+// certificate merely because enough other votes happen to be valid.
 func VerifyCertificate(block Block, cert Certificate, validators map[string]ed25519.PublicKey) error {
+	if block.Height == 0 || block.TimestampUnix <= 0 || (block.Height == 1 && block.PreviousHash != "") {
+		return ErrInvalidHeight
+	}
+	if len(validators) == 0 {
+		return ErrNoQuorum
+	}
 	hash := block.Hash()
-	if cert.BlockHash != hash { return errors.New("consensus: certificate block hash mismatch") }
+	if cert.BlockHash != hash {
+		return fmt.Errorf("%w: block hash mismatch", ErrInvalidCertificate)
+	}
 	quorum := (2*len(validators))/3 + 1
 	seen := make(map[string]struct{}, len(cert.Votes))
-	valid := 0
 	for _, vote := range cert.Votes {
-		if _, exists := seen[vote.ValidatorID]; exists { continue }
+		if _, exists := seen[vote.ValidatorID]; exists {
+			return fmt.Errorf("%w: duplicate validator %q", ErrInvalidCertificate, vote.ValidatorID)
+		}
 		key, ok := validators[vote.ValidatorID]
-		if !ok || vote.BlockHash != hash || !ed25519.Verify(key, []byte(hash), vote.Signature) { continue }
+		if !ok {
+			return fmt.Errorf("%w: unknown validator %q", ErrInvalidCertificate, vote.ValidatorID)
+		}
+		if len(key) != ed25519.PublicKeySize || vote.BlockHash != hash ||
+			len(vote.Signature) != ed25519.SignatureSize ||
+			!ed25519.Verify(key, []byte(hash), vote.Signature) {
+			return fmt.Errorf("%w: invalid vote from %q", ErrInvalidCertificate, vote.ValidatorID)
+		}
 		seen[vote.ValidatorID] = struct{}{}
-		valid++
 	}
-	if len(validators) == 0 || valid < quorum { return ErrNoQuorum }
+	if len(seen) < quorum {
+		return ErrNoQuorum
+	}
 	return nil
 }
 
