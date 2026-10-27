@@ -91,6 +91,17 @@ func TestVerifyCertificateRejectsMalformedValidatorSet(t *testing.T) {
 	}
 }
 
+func TestVerifyCertificateRejectsDuplicateValidatorPublicKeys(t *testing.T) {
+	block, cert, validators := certificateFixture(t, 4)
+	validators["d"] = append(ed25519.PublicKey(nil), validators["a"]...)
+	if err := VerifyCertificate(block, cert, validators); !errors.Is(err, ErrInvalidCertificate) {
+		t.Fatalf("expected duplicate public key rejection, got %v", err)
+	}
+	if _, err := New(validators); err == nil {
+		t.Fatal("expected engine construction to reject duplicate validator public keys")
+	}
+}
+
 func TestVerifyCertificateRejectsMalformedParentHash(t *testing.T) {
 	_, cert, validators := certificateFixture(t, 4)
 	for _, parentHash := range []string{"", "not-a-hash", "abcd"} {
