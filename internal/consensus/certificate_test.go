@@ -74,3 +74,36 @@ func TestVerifyCertificateRequiresQuorum(t *testing.T) {
 		t.Fatalf("expected quorum error, got %v", err)
 	}
 }
+
+func TestVerifyCertificateRejectsMalformedValidatorSet(t *testing.T) {
+	block, cert, validators := certificateFixture(t, 4)
+
+	// Invalid entries must not inflate the validator count used for quorum.
+	validators["malformed"] = ed25519.PublicKey{1, 2, 3}
+	if err := VerifyCertificate(block, cert, validators); !errors.Is(err, ErrInvalidCertificate) {
+		t.Fatalf("expected invalid validator set rejection, got %v", err)
+	}
+
+	delete(validators, "malformed")
+	validators[""] = validators["a"]
+	if err := VerifyCertificate(block, cert, validators); !errors.Is(err, ErrInvalidCertificate) {
+		t.Fatalf("expected empty validator ID rejection, got %v", err)
+	}
+}
+
+func TestVerifyCertificateRejectsMalformedParentHash(t *testing.T) {
+	_, cert, validators := certificateFixture(t, 4)
+	for _, parentHash := range []string{"", "not-a-hash", "abcd"} {
+		block := Block{
+			Height:        2,
+			PreviousHash:  parentHash,
+			TimestampUnix: 2,
+			Payload:       []byte("child"),
+		}
+		invalidCert := cert
+		invalidCert.BlockHash = block.Hash()
+		if err := VerifyCertificate(block, invalidCert, validators); !errors.Is(err, ErrInvalidHeight) {
+			t.Errorf("parent hash %q: expected invalid height/parent error, got %v", parentHash, err)
+		}
+	}
+}
