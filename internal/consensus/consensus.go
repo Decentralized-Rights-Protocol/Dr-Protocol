@@ -61,10 +61,16 @@ func New(validators map[string]ed25519.PublicKey) (*Engine, error) {
 		return nil, errors.New("consensus: validator set cannot be empty")
 	}
 	copySet := make(map[string]ed25519.PublicKey, len(validators))
+	seenKeys := make(map[string]string, len(validators))
 	for id, key := range validators {
 		if id == "" || len(key) != ed25519.PublicKeySize {
 			return nil, fmt.Errorf("consensus: invalid validator %q", id)
 		}
+		keyID := string(key)
+		if previousID, exists := seenKeys[keyID]; exists {
+			return nil, fmt.Errorf("consensus: validators %q and %q share a public key", previousID, id)
+		}
+		seenKeys[keyID] = id
 		copySet[id] = append(ed25519.PublicKey(nil), key...)
 	}
 	return &Engine{validators: copySet, votes: make(map[string]Vote)}, nil
@@ -216,10 +222,16 @@ func VerifyCertificate(block Block, cert Certificate, validators map[string]ed25
 	if len(validators) == 0 {
 		return ErrNoQuorum
 	}
+	seenKeys := make(map[string]string, len(validators))
 	for id, key := range validators {
 		if id == "" || len(key) != ed25519.PublicKeySize {
 			return fmt.Errorf("%w: invalid validator set entry %q", ErrInvalidCertificate, id)
 		}
+		keyID := string(key)
+		if previousID, exists := seenKeys[keyID]; exists {
+			return fmt.Errorf("%w: validators %q and %q share a public key", ErrInvalidCertificate, previousID, id)
+		}
+		seenKeys[keyID] = id
 	}
 	hash := block.Hash()
 	if cert.BlockHash != hash {
