@@ -200,11 +200,26 @@ func (e *Engine) CommitWith(persist func(Block, Certificate) error) (Block, Cert
 // Rejecting invalid extras prevents callers from accidentally accepting a malformed
 // certificate merely because enough other votes happen to be valid.
 func VerifyCertificate(block Block, cert Certificate, validators map[string]ed25519.PublicKey) error {
-	if block.Height == 0 || block.TimestampUnix <= 0 || (block.Height == 1 && block.PreviousHash != "") {
+	if block.Height == 0 || block.TimestampUnix <= 0 {
 		return ErrInvalidHeight
+	}
+	if block.Height == 1 {
+		if block.PreviousHash != "" {
+			return ErrInvalidHeight
+		}
+	} else {
+		parentHash, err := hex.DecodeString(block.PreviousHash)
+		if err != nil || len(parentHash) != sha256.Size {
+			return ErrInvalidHeight
+		}
 	}
 	if len(validators) == 0 {
 		return ErrNoQuorum
+	}
+	for id, key := range validators {
+		if id == "" || len(key) != ed25519.PublicKeySize {
+			return fmt.Errorf("%w: invalid validator set entry %q", ErrInvalidCertificate, id)
+		}
 	}
 	hash := block.Hash()
 	if cert.BlockHash != hash {
