@@ -52,6 +52,7 @@ func (p *parser) take() Token { t:=p.peek(); if p.pos<len(p.tokens) { p.pos++ };
 func (p *parser) expect(value string) (Token,error) { t:=p.take(); if t.Value!=value { return t,fmt.Errorf("line %d: expected %q, got %q",t.Line,value,t.Value) }; return t,nil }
 func (p *parser) identifier() (string,error) { t:=p.take(); if t.Kind!="identifier" { return "",fmt.Errorf("line %d: expected identifier, got %q",t.Line,t.Value) }; return t.Value,nil }
 func (p *parser) block() error { _,err:=p.expect("{"); return err }
+func (p *parser) closeBlock() error { _,err:=p.expect("}"); return err }
 func (p *parser) end() error { _,err:=p.expect(";"); return err }
 
 func Parse(source string) (*IR,error) {
@@ -69,7 +70,7 @@ func Parse(source string) (*IR,error) {
 			if e=p.end(); e!=nil{return nil,e}; ir.Identities=append(ir.Identities,id)
 		case "right":
 			p.take(); n,e:=p.identifier(); if e!=nil{return nil,e}; if seen["right:"+n]{return nil,fmt.Errorf("duplicate right %q",n)}; seen["right:"+n]=true
-			if e=p.block();e!=nil{return nil,e}; if _,e=p.expect("requires");e!=nil{return nil,e}; req,e:=parseProof(p,"PoST");if e!=nil{return nil,e};if e=p.end();e!=nil{return nil,e};if e=p.expect("}");e!=nil{return nil,e}
+			if e=p.block();e!=nil{return nil,e}; if _,e=p.expect("requires");e!=nil{return nil,e}; req,e:=parseProof(p,"PoST");if e!=nil{return nil,e};if e=p.end();e!=nil{return nil,e};if e=p.closeBlock();e!=nil{return nil,e}
 			ir.Declarations=append(ir.Declarations,Declaration{Kind:"right",Name:n,Requires:[]Requirement{req}})
 		case "activity":
 			p.take(); n,e:=p.identifier();if e!=nil{return nil,e};if seen["activity:"+n]{return nil,fmt.Errorf("duplicate activity %q",n)};seen["activity:"+n]=true
@@ -80,7 +81,7 @@ func Parse(source string) (*IR,error) {
 		case "verify":
 			p.take();if ir.ElderQuorum!=0{return nil,fmt.Errorf("duplicate verify block")};if e:=p.block();e!=nil{return nil,e}
 			if _,e:=p.expect("quorum");e!=nil{return nil,e};if _,e:=p.expect("elders");e!=nil{return nil,e};if _,e:=p.expect(">=");e!=nil{return nil,e};num:=p.take();if num.Kind!="number"{return nil,fmt.Errorf("line %d: expected quorum integer",num.Line)};q,_:=strconv.Atoi(num.Value);if q<1{return nil,fmt.Errorf("line %d: quorum must be positive",num.Line)};ir.ElderQuorum=q
-			if e:=p.end();e!=nil{return nil,e};if e:=p.expect("}");e!=nil{return nil,e}
+			if e:=p.end();e!=nil{return nil,e};if e:=p.closeBlock();e!=nil{return nil,e}
 		default: t:=p.peek();return nil,fmt.Errorf("line %d: unexpected declaration %q",t.Line,t.Value)
 		}
 	}
