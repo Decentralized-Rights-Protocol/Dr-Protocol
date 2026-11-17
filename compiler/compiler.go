@@ -76,7 +76,7 @@ func Parse(source string) (*IR,error) {
 			p.take(); n,e:=p.identifier();if e!=nil{return nil,e};if seen["activity:"+n]{return nil,fmt.Errorf("duplicate activity %q",n)};seen["activity:"+n]=true
 			if e=p.block();e!=nil{return nil,e};if _,e=p.expect("requires");e!=nil{return nil,e};req,e:=parseProof(p,"PoAT");if e!=nil{return nil,e};if e=p.end();e!=nil{return nil,e}
 			if _,e=p.expect("reward");e!=nil{return nil,e};num:=p.take();if num.Kind!="number"{return nil,fmt.Errorf("line %d: expected integer reward",num.Line)};v,_:=strconv.Atoi(num.Value)
-			asset,e:=p.identifier();if e!=nil{return nil,e};if asset!="RIGHTS"{return nil,fmt.Errorf("line %d: unsupported reward asset %q (expected RIGHTS)",num.Line,asset)};if e=p.end();e!=nil{return nil,e};if e=p.expect("}");e!=nil{return nil,e}
+			asset,e:=p.identifier();if e!=nil{return nil,e};if asset!="RIGHTS"{return nil,fmt.Errorf("line %d: unsupported reward asset %q (expected RIGHTS)",num.Line,asset)};if e=p.end();e!=nil{return nil,e};if e=p.closeBlock();e!=nil{return nil,e}
 			ir.Declarations=append(ir.Declarations,Declaration{Kind:"activity",Name:n,Requires:[]Requirement{req},Reward:&v,Asset:asset})
 		case "verify":
 			p.take();if ir.ElderQuorum!=0{return nil,fmt.Errorf("duplicate verify block")};if e:=p.block();e!=nil{return nil,e}
