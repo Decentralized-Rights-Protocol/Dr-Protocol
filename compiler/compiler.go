@@ -24,6 +24,9 @@ func Lex(source string) ([]Token, error) {
 	last := 0
 	for _, m := range matches {
 		chunk := source[last:m[0]]
+		if strings.TrimSpace(chunk) != "" {
+			return nil, fmt.Errorf("line %d: unexpected input %q", line+strings.Count(chunk, "\n"), strings.TrimSpace(chunk))
+		}
 		line += strings.Count(chunk, "\n")
 		value := source[m[0]:m[1]]
 		if !validToken.MatchString(value) { return nil, fmt.Errorf("line %d: invalid token %q", line, value) }
