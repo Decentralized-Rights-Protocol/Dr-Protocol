@@ -12,37 +12,10 @@ import (
 	"github.com/Decentralized-Rights-Protocol/Dr-Protocol/internal/verification"
 )
 
-type Server struct {
-	Store *store.Store
-	Engine verification.Engine
-	Registry *Registry
-	Peers *PeerBook
-	Signer *drpcrypto.Signer
-}
+type Server struct { Store *store.Store; Engine verification.Engine; Registry *Registry; Peers *PeerBook; Signer *drpcrypto.Signer; Consensus *ConsensusAPI }
+func New(s *store.Store)*Server { signer,_:=drpcrypto.NewSigner(); return &Server{Store:s,Registry:NewRegistry(),Peers:NewPeerBook(),Signer:signer} }
 
-// New retains the convenient ephemeral setup used by tests and local demos.
-func New(s *store.Store) *Server {
-	signer, err := drpcrypto.NewSigner()
-	if err != nil { panic("generate ephemeral DRP node identity: " + err.Error()) }
-	return NewWithSigner(s, signer)
-}
-
-// NewWithSigner allows the daemon to load a stable identity from its data directory.
-func NewWithSigner(s *store.Store, signer *drpcrypto.Signer) *Server {
-	return &Server{Store: s, Registry: NewRegistry(), Peers: NewPeerBook(), Signer: signer}
-}
-
-func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", s.health)
-	mux.HandleFunc("/drp/v1/verify", s.verify)
-	mux.HandleFunc("/drp/v1/proofs/", s.proof)
-	mux.HandleFunc("/drp/v1/claims/", s.claim)
-	mux.HandleFunc("/drp/v1/verifiers", s.verifiers)
-	mux.HandleFunc("/drp/v1/peers", s.peers)
-	mux.HandleFunc("/drp/v1/attestations", s.attestations)
-	return mux
-}
+func(s *Server) Handler() http.Handler { mux:=http.NewServeMux(); mux.HandleFunc("/health",s.health); mux.HandleFunc("/drp/v1/verify",s.verify); mux.HandleFunc("/drp/v1/proofs/",s.proof); mux.HandleFunc("/drp/v1/claims/",s.claim); mux.HandleFunc("/drp/v1/verifiers",s.verifiers); mux.HandleFunc("/drp/v1/peers",s.peers); mux.HandleFunc("/drp/v1/attestations",s.attestations); mux.HandleFunc("/drp/v1/consensus/",s.consensusHandler); return mux }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status":"ok", "protocol":"DRP", "version":protocol.Version, "activeVerifiers":s.Registry.ActiveCount(), "peers":len(s.Peers.List())})

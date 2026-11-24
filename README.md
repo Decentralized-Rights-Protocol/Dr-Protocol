@@ -16,8 +16,10 @@ The MVP is intentionally transport-agnostic at the protocol layer and uses HTTP 
 - `internal/protocol` — versioned protocol objects and validation
 - `internal/crypto` — Ed25519 signatures and hashing
 - `internal/verification` — policy evaluation and verifier quorum
-- `internal/network` — HTTP gateway and authenticated peer proof replication
-- `internal/store` — in-memory test store and atomic JSON-backed node store
+- `internal/consensus` — experimental validator quorum, signed votes, commit certificates
+- `internal/store/chain.go` — LevelDB-backed block and certificate persistence
+- `internal/network` — HTTP gateway and peer primitives
+- `internal/store` — local durable MVP store
 - `cmd/drp` — developer CLI
 - `docs/protocol-spec.md` — protocol specification
 
@@ -27,7 +29,7 @@ Requires Go 1.23 or newer.
 
 ```bash
 go test ./...
-go run ./cmd/drpd --addr :8080 --data-dir ./data
+go run ./cmd/drpd --addr :8080 --chain-db ./data/drp-chain
 ```
 
 The daemon creates `./data/store.json` for requests, proofs and attestations, and `./data/node-ed25519.key` for its stable Ed25519 node identity. Keep this directory on a persistent volume and back it up securely. Do not commit it or expose it publicly. The default data directory is local to one process; it is not blockchain consensus or a multi-node database.
@@ -38,6 +40,45 @@ Then:
 curl http://localhost:8080/health
 ```
 
-## Phase A cryptographic hardening\n\nThe current Phase A branch uses purpose-specific SHA-256 digest domains for claims, policies, and evidence, plus separate Ed25519 signature domains for proof objects and peer-replication envelopes. The node key loader also repairs existing key-file permissions to `0600`. New proofs declare the `ed25519-drp-proof-v1` signature scheme. The verifier retains a legacy path for existing proofs with no scheme field; unknown scheme identifiers are rejected. The Go JSON representation is currently deterministic for these structs, but cross-language canonical JSON interoperability remains future work.\n\n## Current limitations
+The protocol is experimental (v0.1) and not production-secure until audited.
 
-The verifier registry and peer book are still in-memory and must be reconfigured after restart. Replication is authenticated HTTP proof exchange, not BFT consensus. The JSON store is intended as a single-process MVP backend; concurrent daemon processes must not share one data directory. The protocol is experimental (v0.1) and not production-secure until audited.
+## Experimental blockchain consensus
+
+Consensus is opt-in and requires an explicit trusted validator set. Create a JSON
+file mapping validator IDs to base64-encoded Ed25519 **public** keys:
+
+```json
+{
+  "validator-a": "BASE64_ED25519_PUBLIC_KEY",
+  "validator-b": "BASE64_ED25519_PUBLIC_KEY",
+  "validator-c": "BASE64_ED25519_PUBLIC_KEY",
+  "validator-d": "BASE64_ED25519_PUBLIC_KEY"
+}
+```
+
+Start the node with:
+
+```bash
+go run ./cmd/drpd --addr :8080 --chain-db ./data/drp-chain --validators ./validators.json
+```
+
+The node validates the stored chain and its quorum certificates before restoring
+the committed tip. Consensus endpoints are available under
+`/drp/v1/consensus/`:
+
+- `GET /status` — current height, hash, vote count, and quorum.
+- `POST /proposals` — submit a block proposal.
+- `POST /votes` — submit a signed validator vote.
+- `POST /commit` — commit only after quorum and persist the block/certificate.
+
+A proposal JSON body uses `height`, `previous_hash`, `timestamp_unix`, and
+`payload` (base64-encoded bytes in JSON). Vote signatures are Ed25519 signatures
+over the UTF-8 block-hash hex string. Keep validator private keys outside the
+node and never put them in this public-key configuration file.
+
+This is an experimental integration, not production BFT. It currently lacks
+leader election, view changes, peer-to-peer consensus message propagation,
+validator-set transitions, and full adversarial/network-partition testing.
+The HTTP endpoints are not authenticated as an operator API; deploy only behind
+a trusted boundary until authorization and transport security are implemented.
+Ed25519 is not post-quantum secure. Do not use this prototype for real assets.
