@@ -1,0 +1,16 @@
+protocol EducationAccess {
+  identity student;
+
+  right education {
+    requires PoST(student, "verified");
+  }
+
+  activity learning {
+    requires PoAT(student);
+    reward 10 RIGHTS;
+  }
+
+  verify {
+    quorum elders >= 15;
+  }
+}
