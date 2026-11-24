@@ -2,9 +2,9 @@ name: DRP Protocol CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/durable-proof-storage-2026-10-12]
   pull_request:
-    branches: [main]
+    branches: [main, feat/durable-proof-storage-2026-10-12]
 
 jobs:
   test:

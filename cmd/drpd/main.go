@@ -21,9 +21,14 @@ func main() {
 	validatorPath := flag.String("validators", "", "JSON file mapping validator IDs to base64 Ed25519 public keys")
 	flag.Parse()
 
-	node := network.New(store.New())
+	persistentStore, err := store.NewPersistent(filepath.Join(*dataDir, "store.json"))
+	if err != nil { log.Fatalf("open DRP persistent store: %v", err) }
+	signer, err := drpcrypto.LoadOrCreateSigner(filepath.Join(*dataDir, "node-ed25519.key"))
+	if err != nil { log.Fatalf("load DRP node identity: %v", err) }
+
+	node := network.NewWithSigner(persistentStore, signer)
 	handler := network.NewReplicationHandler(node)
-	log.Printf("DRP Verification Network v0.1 listening on %s", *addr)
+	log.Printf("DRP Verification Network v0.1 listening on %s (data dir: %s)", *addr, *dataDir)
 	log.Fatal(http.ListenAndServe(*addr, handler))
 }
 
