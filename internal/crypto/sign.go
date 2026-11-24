@@ -31,6 +31,8 @@ func LoadOrCreateSigner(path string) (*Signer, error) {
 	privateKey, err := os.ReadFile(absolutePath)
 	if err == nil {
 		if len(privateKey) != ed25519.PrivateKeySize { return nil, fmt.Errorf("invalid signer key length: got %d bytes", len(privateKey)) }
+		// Existing keys may predate restrictive permissions; repair them before use.
+		if err := os.Chmod(absolutePath, 0o600); err != nil { return nil, fmt.Errorf("secure existing signer key permissions: %w", err) }
 		priv := ed25519.PrivateKey(append([]byte(nil), privateKey...))
 		pub := append(ed25519.PublicKey(nil), priv.Public().(ed25519.PublicKey)...)
 		return &Signer{Private: priv, Public: pub}, nil
@@ -54,4 +56,22 @@ func (s *Signer) Sign(data []byte) string {
 func Verify(pub ed25519.PublicKey, data []byte, encoded string) bool {
 	sig, err := base64.RawURLEncoding.DecodeString(encoded)
 	return err == nil && ed25519.Verify(pub, data, sig)
+}
+
+
+// SignDomain signs a payload with an explicit protocol purpose. The prefix is
+// versioned and NUL-delimited so signatures cannot be reused across DRP domains.
+func (s *Signer) SignDomain(domain string, data []byte) string {
+	return s.Sign(domainSeparatedPayload(domain, data))
+}
+
+// VerifyDomain verifies a signature over a domain-separated payload.
+func VerifyDomain(pub ed25519.PublicKey, domain string, data []byte, encoded string) bool {
+	sig, err := base64.RawURLEncoding.DecodeString(encoded)
+	return err == nil && ed25519.Verify(pub, domainSeparatedPayload(domain, data), sig)
+}
+
+func domainSeparatedPayload(domain string, data []byte) []byte {
+	prefix := []byte("DRP-SIGNATURE-V1\x00" + domain + "\x00")
+	return append(prefix, data...)
 }

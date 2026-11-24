@@ -14,7 +14,7 @@ MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are interpreted as protocol requirem
 
 The canonical objects are Identity, Claim, Evidence, VerificationRequest, VerificationPolicy, Attestation, VerificationResult, Proof, Challenge, and Revocation.
 
-Each object MUST have a version, stable identifier, creation timestamp where applicable, and deterministic JSON representation when signed or hashed.
+Each object MUST have a version, stable identifier, creation timestamp where applicable, and deterministic JSON representation when signed or hashed. The v0.1 Go implementation uses Go JSON serialization for its current wire representation; cross-language canonicalization rules still require a separately versioned interoperability specification.
 
 Raw private evidence SHOULD remain off-chain/off-network. The protocol records hashes, commitments, provenance, and proofs unless disclosure is explicitly authorized.
 

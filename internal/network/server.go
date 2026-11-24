@@ -56,20 +56,19 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	if err := s.Store.PutRequest(req); err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not persist verification request"}); return }
 	attestations := s.Store.GetAttestations(req.Claim.ID)
 	result := s.Engine.Evaluate(req, attestations)
-	digest, err := protocol.CanonicalDigest(req.Claim)
+	digest, err := protocol.CanonicalDigestDomain("drp/claim/v1", req.Claim)
 	if err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not digest claim"}); return }
-	policyDigest, err := protocol.CanonicalDigest(req.Policy)
+	policyDigest, err := protocol.CanonicalDigestDomain("drp/policy/v1", req.Policy)
 	if err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not digest policy"}); return }
 	evidenceDigests := make([]string, 0, len(req.Evidence))
 	for _, evidence := range req.Evidence {
-		d, err := protocol.CanonicalDigest(evidence)
+		d, err := protocol.CanonicalDigestDomain("drp/evidence/v1", evidence)
 		if err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not digest evidence"}); return }
 		evidenceDigests = append(evidenceDigests, d)
 	}
 	proof := protocol.Proof{Version:protocol.Version, ID:req.ID+":proof", ClaimDigest:digest, PolicyDigest:policyDigest, EvidenceDigests:evidenceDigests, Result:result, CreatedAt:time.Now().UTC()}
-	payload, err := json.Marshal(proof)
-	if err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not encode proof"}); return }
-	proof.Signature = s.Signer.Sign(payload)
+	proof, err = drpcrypto.SignProof(s.Signer, proof)
+	if err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not sign proof"}); return }
 	if err := s.Store.PutProof(proof); err != nil { writeJSON(w, http.StatusInternalServerError, map[string]string{"error":"could not persist proof"}); return }
 	writeJSON(w, http.StatusAccepted, map[string]any{"result":result, "proof":proof, "network":"DRP Verification Network"})
 }
