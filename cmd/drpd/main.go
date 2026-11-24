@@ -21,29 +21,10 @@ func main() {
 	validatorPath := flag.String("validators", "", "JSON file mapping validator IDs to base64 Ed25519 public keys")
 	flag.Parse()
 
-	chain, err := store.OpenChain(*chainPath)
-	if err != nil { log.Fatalf("open chain storage: %v", err) }
-	defer chain.Close()
-
-	srv := network.New(store.New())
-	if *validatorPath != "" {
-		validators, err := loadValidators(*validatorPath)
-		if err != nil { log.Fatalf("load validators: %v", err) }
-		engine, err := consensus.New(validators)
-		if err != nil { log.Fatalf("initialize consensus: %v", err) }
-		if err := chain.ValidateChain(validators); err != nil { log.Fatalf("validate persisted chain: %v", err) }
-		if tip, ok, err := chain.Tip(); err != nil {
-			log.Fatalf("read chain tip: %v", err)
-		} else if ok {
-			if err := engine.RestoreCommitted(tip); err != nil { log.Fatalf("restore consensus tip: %v", err) }
-		}
-		srv.ConfigureConsensus(engine, validators, chain)
-		log.Printf("DRP consensus enabled with %d validators; quorum=%d",len(validators),engine.Quorum())
-	} else {
-		log.Printf("DRP consensus API disabled: provide --validators with trusted validator public keys")
-	}
-	log.Printf("DRP Verification Network v0.2 listening on %s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, srv.Handler()))
+	node := network.New(store.New())
+	handler := network.NewReplicationHandler(node)
+	log.Printf("DRP Verification Network v0.1 listening on %s", *addr)
+	log.Fatal(http.ListenAndServe(*addr, handler))
 }
 
 func loadValidators(path string) (map[string]ed25519.PublicKey, error) {
