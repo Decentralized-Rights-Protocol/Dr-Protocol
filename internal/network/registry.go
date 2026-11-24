@@ -10,6 +10,7 @@ type Verifier struct {
 	Name string `json:"name"`
 	Capabilities []string `json:"capabilities,omitempty"`
 	PublicKey string `json:"publicKey,omitempty"`
+	SignatureAlgorithm string `json:"signatureAlgorithm,omitempty"`
 	Active bool `json:"active"`
 }
 
